@@ -1,33 +1,20 @@
-////////////////////////////////  ////////////////////////////////////////
+///////////////////////////////////////////////////////////////
 // Arduino Bluetooth Interface with Mindwave
-// 
-// This is example code provided by NeuroSky, Inc. and is provided
-// license free.
+// Sophi Kravitz edit 11-4
+// Shane Clements edit 11-5
 ////////////////////////////////////////////////////////////////////////
+#include <SoftwareSerial.h>     // library for software serial
+SoftwareSerial mySerial(5, 6);  // RX, TX
+int LED = 8;                    // yellow one
+int LED1 = 7;                   //white one
+int BAUDRATE = 57600;
 
-#define LED 13
-#define BAUDRATE 57600
-#define DEBUGOUTPUT 0
-
-#define GREENLED1  3
-#define GREENLED2  4
-#define GREENLED3  5
-#define YELLOWLED1 6
-#define YELLOWLED2 7
-#define YELLOWLED3 8
-#define YELLOWLED4 9
-#define REDLED1    10
-#define REDLED2    11
-#define REDLED3    12
-
-#define powercontrol 10
-
-// checksum variableS
-byte generatedChecksum = 0;
-byte checksum = 0; 
+// checksum variables
+byte payloadChecksum = 0;
+byte CalculatedChecksum;
+byte checksum = 0;              //data type byte stores an 8-bit unsigned number, from 0 to 255
 int payloadLength = 0;
-byte payloadData[64] = {
-  0};
+byte payloadData[64] = {0};
 byte poorQuality = 0;
 byte attention = 0;
 byte meditation = 0;
@@ -35,262 +22,157 @@ byte meditation = 0;
 // system variables
 long lastReceivedPacket = 0;
 boolean bigPacket = false;
-double RAW = 0;
-
-//////////////////////////
-// Microprocessor Setup //
-//////////////////////////
+boolean brainwave = false;
 void setup() {
-
-  pinMode(GREENLED1, OUTPUT);
-  pinMode(GREENLED2, OUTPUT);
-  pinMode(GREENLED3, OUTPUT);
-  pinMode(YELLOWLED1, OUTPUT);
-  pinMode(YELLOWLED2, OUTPUT);
-  pinMode(YELLOWLED3, OUTPUT);
-  pinMode(YELLOWLED4, OUTPUT);
-  pinMode(REDLED1, OUTPUT);
-  pinMode(REDLED2, OUTPUT);
-  pinMode(REDLED3, OUTPUT);
-
   pinMode(LED, OUTPUT);
-  Serial.begin(BAUDRATE);           // USB
-
+  pinMode(LED1, OUTPUT);
+  digitalWrite(LED, HIGH);   // hello sequence
+  delay(100);
+  digitalWrite(LED, LOW);
+  delay(100);
+  Serial.begin(57600);       // Bluetooth
+  delay(500);
+  mySerial.begin(4800);      // software serial
+  delay(500);
+  mySerial.print("Communicating... ");
+  mySerial.println();
 }
-
-////////////////////////////////
-// Read data from Serial UART //
-////////////////////////////////
 byte ReadOneByte() {
   int ByteRead;
-
-  while(!Serial.available());
+  // Wait until there is data
+  while (!Serial.available());
+  //Get the number of bytes (characters) available for reading from the serial port.
+  //This is data that's already arrived and stored in the serial receive buffer (which holds 64 bytes)
   ByteRead = Serial.read();
-
-#if DEBUGOUTPUT  
-  Serial.print((char)ByteRead);   // echo the same byte out the USB serial (for debug purposes)
-#endif
-
-  return ByteRead;
+  return ByteRead; // read incoming serial data
 }
 
-/////////////
-//MAIN LOOP//
-/////////////
+unsigned int delta_wave = 0;
+unsigned int theta_wave = 0;
+unsigned int low_alpha_wave = 0;
+unsigned int high_alpha_wave = 0;
+unsigned int low_beta_wave = 0;
+unsigned int high_beta_wave = 0;
+unsigned int low_gamma_wave = 0;
+unsigned int mid_gamma_wave = 0;
+
+void read_waves(int i) {
+  delta_wave = read_3byte_int(i);
+  i += 3;
+  theta_wave = read_3byte_int(i);
+  i += 3;
+  low_alpha_wave = read_3byte_int(i);
+  i += 3;
+  high_alpha_wave = read_3byte_int(i);
+  i += 3;
+  low_beta_wave = read_3byte_int(i);
+  i += 3;
+  high_beta_wave = read_3byte_int(i);
+  i += 3;
+  low_gamma_wave = read_3byte_int(i);
+  i += 3;
+  mid_gamma_wave = read_3byte_int(i);
+}
+
+int read_3byte_int(int i) {
+  return ((payloadData[i] << 16) + (payloadData[i + 1] << 8) + payloadData[i + 2]);
+}
+
 void loop() {
-
-
   // Look for sync bytes
-  if(ReadOneByte() == 170) {
-    if(ReadOneByte() == 170) {
-
+  // Byte order: 0xAA, 0xAA, payloadLength, payloadData,
+  // Checksum (sum all the bytes of payload, take lowest 8 bits, then bit inverse on lowest
+  if (ReadOneByte() == 0xAA) {
+    if (ReadOneByte() == 0xAA) {
       payloadLength = ReadOneByte();
-      if(payloadLength > 169)                      //Payload length can not be greater than 169
-          return;
-
-      generatedChecksum = 0;        
-      for(int i = 0; i < payloadLength; i++) {  
-        payloadData[i] = ReadOneByte();            //Read payload into memory
-        generatedChecksum += payloadData[i];
-      }   
-
-      checksum = ReadOneByte();                      //Read checksum byte from stream      
-      generatedChecksum = 255 - generatedChecksum;   //Take one's compliment of generated checksum
-
-        if(checksum == generatedChecksum) {    
-
+      if (payloadLength > 169) //Payload length can not be greater than 169
+        return;
+      payloadChecksum = 0;
+      for (int i = 0; i < payloadLength; i++) {     //loop until payload length is complete
+        payloadData[i] = ReadOneByte();             //Read payload
+        payloadChecksum += payloadData[i];
+      }
+      checksum = ReadOneByte();                     //Read checksum byte from stream
+      payloadChecksum = 255 - payloadChecksum;      //Take one’s compliment of generated checksum
+      if (checksum == payloadChecksum) {
         poorQuality = 200;
         attention = 0;
         meditation = 0;
-
-        for(int i = 0; i < payloadLength; i++) {    // Parse the payload
-          switch (payloadData[i]) {
-          case 2:
-            i++;            
-            poorQuality = payloadData[i];
-            bigPacket = true;            
-            break;
-          case 4:
+      }
+      brainwave = false;
+      for (int i = 0; i < payloadLength; i++) { // Parse the payload
+        switch (payloadData[i]) {
+          case 02:
             i++;
-            attention = payloadData[i];                        
+            poorQuality = payloadData[i];
+            bigPacket = true;
             break;
-          case 5:
+          case 04:
+            i++;
+            attention = payloadData[i];
+            break;
+          case 05:
             i++;
             meditation = payloadData[i];
             break;
           case 0x80:
             i = i + 3;
-            RAW= payloadData[i];
             break;
-          case 0x83:
-            i = i + 25;      
+          case 0x83:                         // ASIC EEG POWER INT
+            i++;
+            brainwave = true;
+            byte vlen = payloadData[i];
+            //mySerial.print(vlen, DEC);
+            //mySerial.println();
+            read_waves(i + 1);
+            i += vlen; // i = i + vlen
             break;
-          default:
-            break;
-          } // switch
-        } // for loop
+        }                                 // switch
+      }                                   // for loop
 
-#if !DEBUGOUTPUT
-
-        // *** Add your code here ***
-
-        if(bigPacket) {
-          if(poorQuality <= 100)
-            digitalWrite(LED, HIGH);
-          else
-            digitalWrite(LED, LOW);
-          Serial.print("PoorQuality: ");
-          Serial.print(poorQuality, DEC);
-          Serial.print(" Attention: ");
-          Serial.print(attention, DEC);
-          Serial.print("blink: ");
-          Serial.print(RAW, DEC);
-          Serial.print(" Time since last packet: ");
-          Serial.print(millis() - lastReceivedPacket, DEC);
-          lastReceivedPacket = millis();
-          Serial.print("\n");
-
-          switch(attention / 10) {
-          case 0:
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, LOW);
-            digitalWrite(GREENLED3, LOW);
-            digitalWrite(YELLOWLED1, LOW);
-            digitalWrite(YELLOWLED2, LOW);
-            digitalWrite(YELLOWLED3, LOW);
-            digitalWrite(YELLOWLED4, LOW);
-            digitalWrite(REDLED1, LOW);
-            digitalWrite(REDLED2, LOW);
-            digitalWrite(REDLED3, LOW);           
-            break;
-          case 1:
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, HIGH);
-            digitalWrite(GREENLED3, LOW);
-            digitalWrite(YELLOWLED1, LOW);
-            digitalWrite(YELLOWLED2, LOW);
-            digitalWrite(YELLOWLED3, LOW);
-            digitalWrite(YELLOWLED4, LOW);
-            digitalWrite(REDLED1, LOW);
-            digitalWrite(REDLED2, LOW);
-            digitalWrite(REDLED3, LOW);
-            break;
-          case 2:
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, HIGH);
-            digitalWrite(GREENLED3, HIGH);
-            digitalWrite(YELLOWLED1, LOW);
-            digitalWrite(YELLOWLED2, LOW);
-            digitalWrite(YELLOWLED3, LOW);
-            digitalWrite(YELLOWLED4, LOW);
-            digitalWrite(REDLED1, LOW);
-            digitalWrite(REDLED2, LOW);
-            digitalWrite(REDLED3, LOW);
-            break;
-          case 3:              
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, HIGH);
-            digitalWrite(GREENLED3, HIGH);              
-            digitalWrite(YELLOWLED1, HIGH);
-            digitalWrite(YELLOWLED2, LOW);
-            digitalWrite(YELLOWLED3, LOW);
-            digitalWrite(YELLOWLED4, LOW);
-            digitalWrite(REDLED1, LOW);
-            digitalWrite(REDLED2, LOW);
-            digitalWrite(REDLED3, LOW);             
-            break;
-          case 4:
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, HIGH);
-            digitalWrite(GREENLED3, HIGH);              
-            digitalWrite(YELLOWLED1, HIGH);
-            digitalWrite(YELLOWLED2, HIGH);
-            digitalWrite(YELLOWLED3, LOW);
-            digitalWrite(YELLOWLED4, LOW);
-            digitalWrite(REDLED1, LOW);
-            digitalWrite(REDLED2, LOW);
-            digitalWrite(REDLED3, LOW);              
-            break;
-          case 5:
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, HIGH);
-            digitalWrite(GREENLED3, HIGH);              
-            digitalWrite(YELLOWLED1, HIGH);
-            digitalWrite(YELLOWLED2, HIGH);
-            digitalWrite(YELLOWLED3, HIGH);
-            digitalWrite(YELLOWLED4, LOW);
-            digitalWrite(REDLED1, LOW);
-            digitalWrite(REDLED2, LOW);
-            digitalWrite(REDLED3, LOW);               
-            break;
-          case 6:              
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, HIGH);
-            digitalWrite(GREENLED3, HIGH);              
-            digitalWrite(YELLOWLED1, HIGH);
-            digitalWrite(YELLOWLED2, HIGH);
-            digitalWrite(YELLOWLED3, HIGH);
-            digitalWrite(YELLOWLED4, HIGH);
-            digitalWrite(REDLED1, LOW);
-            digitalWrite(REDLED2, LOW);
-            digitalWrite(REDLED3, LOW);              
-            break;
-          case 7:
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, HIGH);
-            digitalWrite(GREENLED3, HIGH);              
-            digitalWrite(YELLOWLED1, HIGH);
-            digitalWrite(YELLOWLED2, HIGH);
-            digitalWrite(YELLOWLED3, HIGH);
-            digitalWrite(YELLOWLED4, HIGH);
-            digitalWrite(REDLED1, HIGH);
-            digitalWrite(REDLED2, LOW);
-            digitalWrite(REDLED3, LOW);              
-            break;    
-          case 8:
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, HIGH);
-            digitalWrite(GREENLED3, HIGH);              
-            digitalWrite(YELLOWLED1, HIGH);
-            digitalWrite(YELLOWLED2, HIGH);
-            digitalWrite(YELLOWLED3, HIGH);
-            digitalWrite(YELLOWLED4, HIGH);
-            digitalWrite(REDLED1, HIGH);
-            digitalWrite(REDLED2, HIGH);
-            digitalWrite(REDLED3, LOW);
-            break;
-          case 9:
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, HIGH);
-            digitalWrite(GREENLED3, HIGH);              
-            digitalWrite(YELLOWLED1, HIGH);
-            digitalWrite(YELLOWLED2, HIGH);
-            digitalWrite(YELLOWLED3, HIGH);
-            digitalWrite(YELLOWLED4, HIGH);
-            digitalWrite(REDLED1, HIGH);
-            digitalWrite(REDLED2, HIGH); 
-            digitalWrite(REDLED3, HIGH);
-            break;
-          case 10:
-            digitalWrite(GREENLED1, HIGH);
-            digitalWrite(GREENLED2, HIGH);
-            digitalWrite(GREENLED3, HIGH);              
-            digitalWrite(YELLOWLED1, HIGH);
-            digitalWrite(YELLOWLED2, HIGH);
-            digitalWrite(YELLOWLED3, HIGH);
-            digitalWrite(YELLOWLED4, HIGH);
-            digitalWrite(REDLED1, HIGH);
-            digitalWrite(REDLED2, HIGH); 
-            digitalWrite(REDLED3, HIGH);
-            break;           
-          }                     
+      if (bigPacket) {
+        if (poorQuality == 0) {
+          Serial.print("paquete perdido");
         }
-#endif        
-        bigPacket = false;        
+        else {     
+          Serial.print("paquete perdido");// do nothing
+        }
       }
-      else {
-        // Checksum Error
-      }  // end if else for checksum
-    } // end if read 0xAA byte
-  } // end if read 0xAA byte
+
+
+      if (brainwave && attention > 0 && attention < 100) {
+        mySerial.print("Attention value is: ");
+        Serial.print(attention, DEC);
+        Serial.println();
+        Serial.print("Delta value is: ");
+        Serial.print(delta_wave, DEC);
+        Serial.println();
+        Serial.print("Theta value is: ");
+        Serial.print(theta_wave, DEC);
+        Serial.println();
+        Serial.print("Low Alpha value is: ");
+        Serial.print(low_alpha_wave, DEC);
+        Serial.println();
+        Serial.print("High Alpha value is: ");
+        Serial.print(high_alpha_wave, DEC);
+        Serial.println();
+        Serial.print("Alertness value1 is: ");
+        Serial.print(low_beta_wave, DEC);
+        Serial.println();
+        Serial.print("Alertness value2 is: ");
+        Serial.print(high_beta_wave, DEC);
+        Serial.println();
+        Serial.print(low_gamma_wave, DEC);
+        Serial.println();
+        Serial.print(mid_gamma_wave, DEC);
+        Serial.println();
+      }
+
+      if (attention > 40) {
+        digitalWrite(LED1, HIGH);
+      }
+      else
+        digitalWrite(LED1, LOW);
+    }
+  }
 }

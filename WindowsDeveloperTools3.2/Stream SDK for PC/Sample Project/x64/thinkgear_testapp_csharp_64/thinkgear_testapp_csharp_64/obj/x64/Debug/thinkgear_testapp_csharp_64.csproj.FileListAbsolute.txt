@@ -9,3 +9,9 @@ E:\MDT\20150709\comm release\Stream SDK for PC V1.2.0\Sample Project\x64\thinkge
 E:\MDT\20150709\comm release\Stream SDK for PC V1.2.0\Sample Project\x64\thinkgear_testapp_csharp_64\thinkgear_testapp_csharp_64\bin\x64\Debug\thinkgear_testapp_csharp_64.exe
 E:\MDT\20150709\comm release\Stream SDK for PC V1.2.0\Sample Project\x64\thinkgear_testapp_csharp_64\thinkgear_testapp_csharp_64\bin\x64\Debug\thinkgear_testapp_csharp_64.pdb
 E:\MDT\20150709\comm release\Stream SDK for PC V1.2.0\Sample Project\x64\thinkgear_testapp_csharp_64\thinkgear_testapp_csharp_64\obj\x64\Debug\thinkgear_testapp_csharp_64.csprojResolveAssemblyReference.cache
+C:\Users\matias\Desktop\Repositorios\MindWave\WindowsDeveloperTools3.2\Stream SDK for PC\Sample Project\x64\thinkgear_testapp_csharp_64\thinkgear_testapp_csharp_64\bin\x64\Debug\thinkgear_testapp_csharp_64.exe.config
+C:\Users\matias\Desktop\Repositorios\MindWave\WindowsDeveloperTools3.2\Stream SDK for PC\Sample Project\x64\thinkgear_testapp_csharp_64\thinkgear_testapp_csharp_64\bin\x64\Debug\thinkgear_testapp_csharp_64.exe
+C:\Users\matias\Desktop\Repositorios\MindWave\WindowsDeveloperTools3.2\Stream SDK for PC\Sample Project\x64\thinkgear_testapp_csharp_64\thinkgear_testapp_csharp_64\bin\x64\Debug\thinkgear_testapp_csharp_64.pdb
+C:\Users\matias\Desktop\Repositorios\MindWave\WindowsDeveloperTools3.2\Stream SDK for PC\Sample Project\x64\thinkgear_testapp_csharp_64\thinkgear_testapp_csharp_64\obj\x64\Debug\thinkgear_testapp_csharp_64.csproj.CoreCompileInputs.cache
+C:\Users\matias\Desktop\Repositorios\MindWave\WindowsDeveloperTools3.2\Stream SDK for PC\Sample Project\x64\thinkgear_testapp_csharp_64\thinkgear_testapp_csharp_64\obj\x64\Debug\thinkgear_testapp_csharp_64.exe
+C:\Users\matias\Desktop\Repositorios\MindWave\WindowsDeveloperTools3.2\Stream SDK for PC\Sample Project\x64\thinkgear_testapp_csharp_64\thinkgear_testapp_csharp_64\obj\x64\Debug\thinkgear_testapp_csharp_64.pdb
