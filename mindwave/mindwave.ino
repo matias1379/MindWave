@@ -1,178 +1,167 @@
-///////////////////////////////////////////////////////////////
-// Arduino Bluetooth Interface with Mindwave
-// Sophi Kravitz edit 11-4
-// Shane Clements edit 11-5
-////////////////////////////////////////////////////////////////////////
-#include <SoftwareSerial.h>     // library for software serial
-SoftwareSerial mySerial(5, 6);  // RX, TX
-int LED = 8;                    // yellow one
-int LED1 = 7;                   //white one
-int BAUDRATE = 57600;
+﻿//                                                         //
+//    Program       : Mindwave with Arduino                //
+//    Interfacing   : HC-05 Bluetooth Module               //
+//    Output        : Eye Blink Control LED                //
 
-// checksum variables
-byte payloadChecksum = 0;
-byte CalculatedChecksum;
-byte checksum = 0;              //data type byte stores an 8-bit unsigned number, from 0 to 255
-int payloadLength = 0;
-byte payloadData[64] = {0};
-byte poorQuality = 0;
-byte attention = 0;
-byte meditation = 0;
+#define   BAUDRATE           57600
+#define   LED                5
+#define   Theshold_Eyeblink  110
+#define   EEG_AVG            70
 
-// system variables
-long lastReceivedPacket = 0;
-boolean bigPacket = false;
-boolean brainwave = false;
-void setup() {
-  pinMode(LED, OUTPUT);
-  pinMode(LED1, OUTPUT);
-  digitalWrite(LED, HIGH);   // hello sequence
-  delay(100);
-  digitalWrite(LED, LOW);
-  delay(100);
-  Serial.begin(57600);       // Bluetooth
-  delay(500);
-  mySerial.begin(4800);      // software serial
-  delay(500);
-  mySerial.print("Communicating... ");
-  mySerial.println();
-}
-byte ReadOneByte() {
-  int ByteRead;
-  // Wait until there is data
-  while (!Serial.available());
-  //Get the number of bytes (characters) available for reading from the serial port.
-  //This is data that's already arrived and stored in the serial receive buffer (which holds 64 bytes)
-  ByteRead = Serial.read();
-  return ByteRead; // read incoming serial data
-}
+long payloadDataS[5] = {0};
+long payloadDataB[32] = {0};
+byte checksum=0,generatedchecksum=0;
+unsigned int Raw_data,Poorquality,Plength,Eye_Enable=0,On_Flag=0,Off_Flag=1 ;
+unsigned int j,n=0;
+long Temp,Avg_Raw,Temp_Avg;
 
-unsigned int delta_wave = 0;
-unsigned int theta_wave = 0;
-unsigned int low_alpha_wave = 0;
-unsigned int high_alpha_wave = 0;
-unsigned int low_beta_wave = 0;
-unsigned int high_beta_wave = 0;
-unsigned int low_gamma_wave = 0;
-unsigned int mid_gamma_wave = 0;
+ void setup()
+ {
+   Serial.begin(BAUDRATE);           // USB
+   pinMode(LED, OUTPUT);
+ }
 
-void read_waves(int i) {
-  delta_wave = read_3byte_int(i);
-  i += 3;
-  theta_wave = read_3byte_int(i);
-  i += 3;
-  low_alpha_wave = read_3byte_int(i);
-  i += 3;
-  high_alpha_wave = read_3byte_int(i);
-  i += 3;
-  low_beta_wave = read_3byte_int(i);
-  i += 3;
-  high_beta_wave = read_3byte_int(i);
-  i += 3;
-  low_gamma_wave = read_3byte_int(i);
-  i += 3;
-  mid_gamma_wave = read_3byte_int(i);
-}
+ byte ReadOneByte()           // One Byte Read Function
+ {
+   int ByteRead;
+   while(!Serial.available());
+   ByteRead = Serial.read();
+   return ByteRead;
+ }
 
-int read_3byte_int(int i) {
-  return ((payloadData[i] << 16) + (payloadData[i + 1] << 8) + payloadData[i + 2]);
-}
-
-void loop() {
-  // Look for sync bytes
-  // Byte order: 0xAA, 0xAA, payloadLength, payloadData,
-  // Checksum (sum all the bytes of payload, take lowest 8 bits, then bit inverse on lowest
-  if (ReadOneByte() == 0xAA) {
-    if (ReadOneByte() == 0xAA) {
-      payloadLength = ReadOneByte();
-      if (payloadLength > 169) //Payload length can not be greater than 169
-        return;
-      payloadChecksum = 0;
-      for (int i = 0; i < payloadLength; i++) {     //loop until payload length is complete
-        payloadData[i] = ReadOneByte();             //Read payload
-        payloadChecksum += payloadData[i];
-      }
-      checksum = ReadOneByte();                     //Read checksum byte from stream
-      payloadChecksum = 255 - payloadChecksum;      //Take one’s compliment of generated checksum
-      if (checksum == payloadChecksum) {
-        poorQuality = 200;
-        attention = 0;
-        meditation = 0;
-      }
-      brainwave = false;
-      for (int i = 0; i < payloadLength; i++) { // Parse the payload
-        switch (payloadData[i]) {
-          case 02:
-            i++;
-            poorQuality = payloadData[i];
-            bigPacket = true;
-            break;
-          case 04:
-            i++;
-            attention = payloadData[i];
-            break;
-          case 05:
-            i++;
-            meditation = payloadData[i];
-            break;
-          case 0x80:
-            i = i + 3;
-            break;
-          case 0x83:                         // ASIC EEG POWER INT
-            i++;
-            brainwave = true;
-            byte vlen = payloadData[i];
-            //mySerial.print(vlen, DEC);
-            //mySerial.println();
-            read_waves(i + 1);
-            i += vlen; // i = i + vlen
-            break;
-        }                                 // switch
-      }                                   // for loop
-
-      if (bigPacket) {
-        if (poorQuality == 0) {
-          Serial.print("paquete perdido");
-        }
-        else {     
-          Serial.print("paquete perdido");// do nothing
-        }
-      }
-
-
-      if (brainwave && attention > 0 && attention < 100) {
-        mySerial.print("Attention value is: ");
-        Serial.print(attention, DEC);
-        Serial.println();
-        Serial.print("Delta value is: ");
-        Serial.print(delta_wave, DEC);
-        Serial.println();
-        Serial.print("Theta value is: ");
-        Serial.print(theta_wave, DEC);
-        Serial.println();
-        Serial.print("Low Alpha value is: ");
-        Serial.print(low_alpha_wave, DEC);
-        Serial.println();
-        Serial.print("High Alpha value is: ");
-        Serial.print(high_alpha_wave, DEC);
-        Serial.println();
-        Serial.print("Alertness value1 is: ");
-        Serial.print(low_beta_wave, DEC);
-        Serial.println();
-        Serial.print("Alertness value2 is: ");
-        Serial.print(high_beta_wave, DEC);
-        Serial.println();
-        Serial.print(low_gamma_wave, DEC);
-        Serial.println();
-        Serial.print(mid_gamma_wave, DEC);
-        Serial.println();
-      }
-
-      if (attention > 40) {
-        digitalWrite(LED1, HIGH);
-      }
-      else
-        digitalWrite(LED1, LOW);
-    }
-  }
-}
+ void loop()                     // Main Function
+ {
+   if(ReadOneByte() == 170)        // AA 1 st Sync data
+   {
+     if(ReadOneByte() == 170)      // AA 2 st Sync data
+     {
+       Plength = ReadOneByte();
+       if(Plength == 4)   // Small Packet
+       {
+         Small_Packet ();
+         Serial.println("SmallPacket");
+       }
+       else if(Plength == 32)   // Big Packet
+       {
+         Big_Packet ();
+         Serial.println("BigPacket");
+       }
+     }
+   }         
+ }
+ 
+ void Small_Packet ()
+ {
+   generatedchecksum = 0;
+   for(int i = 0; i < Plength; i++)
+   { 
+     payloadDataS[i]     = ReadOneByte();      //Read payload into memory
+     generatedchecksum  += payloadDataS[i] ;
+   }
+   generatedchecksum = 255 - generatedchecksum;
+   checksum  = ReadOneByte();
+   if(checksum == generatedchecksum)        // Varify Checksum
+   { 
+     if (j<512)
+     {
+       Raw_data  = ((payloadDataS[2] <<8)| payloadDataS[3]);
+       if(Raw_data&0xF000)
+       {
+         Raw_data = (((~Raw_data)&0xFFF)+1);
+       }
+       else
+       {
+         Raw_data = (Raw_data&0xFFF);
+       }
+       Temp += Raw_data;
+       j++;
+     }
+     else
+     {
+       Onesec_Rawval_Fun ();
+     }
+   }
+ }
+ 
+ void Big_Packet()
+ {
+   generatedchecksum = 0;
+   for(int i = 0; i < Plength; i++)
+   { 
+     payloadDataB[i]     = ReadOneByte();      //Read payload into memory
+     generatedchecksum  += payloadDataB[i] ;
+   }
+   generatedchecksum = 255 - generatedchecksum;
+   checksum  = ReadOneByte();
+   if(checksum == generatedchecksum)        // Varify Checksum
+   {
+     Poorquality = payloadDataB[1];
+     Serial.println(Poorquality);
+     if (Poorquality==0 )
+     {
+       Eye_Enable = 1;
+     }
+     else
+     {
+       Eye_Enable = 0;
+     }
+   }
+ }
+ 
+ void Onesec_Rawval_Fun ()
+ {
+   Avg_Raw = Temp/512;
+   if (On_Flag==0 && Off_Flag==1)
+   {
+     if (n<3)
+     {
+       Temp_Avg += Avg_Raw;
+       n++;
+     }
+     else
+     {
+       Temp_Avg = Temp_Avg/3;
+       if (Temp_Avg<EEG_AVG)
+       {
+         On_Flag=1;Off_Flag=0;
+       }
+       n=0;Temp_Avg=0;
+     } 
+   }             
+   Eye_Blink ();
+   j=0;
+   Temp=0;
+ }
+ 
+ 
+ void Eye_Blink ()
+ {
+   if (Eye_Enable)         
+   {
+     if (On_Flag==1 && Off_Flag==0)
+     {
+       if ((Avg_Raw>Theshold_Eyeblink) && (Avg_Raw<350))
+       {
+         digitalWrite(LED,HIGH);
+         Serial.println("1");
+       }
+       else
+       {
+         if (Avg_Raw>350)
+         {
+           On_Flag==0;Off_Flag==1;
+         }
+         digitalWrite(LED,LOW);
+         Serial.println("0");
+       }
+     }
+     else
+     {
+       digitalWrite(LED,LOW);
+     }
+   }       
+   else
+   {
+     digitalWrite(LED,LOW);
+   }
+ }
