@@ -1,4 +1,4 @@
-﻿//                                                         //
+//                                                         //
 //    Program       : Mindwave with Arduino                //
 //    Interfacing   : HC-05 Bluetooth Module               //
 //    Output        : Eye Blink Control LED                //
@@ -39,7 +39,7 @@ long Temp,Avg_Raw,Temp_Avg;
        if(Plength == 4)   // Small Packet
        {
          Small_Packet ();
-         Serial.println("SmallPacket");
+         
        }
        else if(Plength == 32)   // Big Packet
        {
@@ -75,6 +75,7 @@ long Temp,Avg_Raw,Temp_Avg;
        }
        Temp += Raw_data;
        j++;
+       Serial.println(Raw_data,DEC);
      }
      else
      {
